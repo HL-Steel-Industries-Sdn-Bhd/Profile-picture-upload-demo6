@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Profile Demo</title>
+
+<style>
+    body { font-family: Arial, sans-serif; padding: 20px; }
+    #profileContainer {
+        width: 200px; height: 200px; border-radius: 10px;
+        border: 2px dashed #999; display: flex; align-items: center;
+        justify-content: center; position: relative; overflow: hidden;
+        background: #f9f9f9;
+    }
+    #profileImg {
+        width: 100%; height: 100%; object-fit: cover; position: absolute;
+        top: 0; left: 0; display: none; z-index: 1;
+    }
+    #uploadBtn {
+        padding: 10px 15px; background: #1976d2; color: white;
+        border: none; border-radius: 6px; cursor: pointer;
+        z-index: 2; position: absolute;
+    }
+    #editIcon {
+        position: absolute; bottom: 5px; right: 5px;
+        width: 24px; opacity: 0.7; cursor: pointer;
+        display: none; z-index: 3;
+    }
+    #hiddenUpload { display:none; }
+    iframe { display:none; }
+</style>
+</head>
+<body>
+
+<h2>Profile Picture</h2>
+
+<!-- 👇 每个 HTML 写死不同的 userName -->
+<script>
+    const USER_NAME = "Cyril";  // ← 换名字即换个人
+</script>
+
+<div id="profileContainer">
+    <img id="profileImg" />
+    <button id="uploadBtn">Upload Photo</button>
+    <img id="editIcon" src="" />
+</div>
+
+<input type="file" accept="image/*" id="hiddenUpload">
+
+<iframe id="hiddenFrame" name="hiddenFrame"></iframe>
+
+<form id="uploadForm"
+      action="[https://script.google.com/macros/s/AKfycbyluiNgeQXBOw5KEnkWTqVMkCV8RdLLnzbyt3xwF29XnM6Bo4h4PynmS-jzibPLrCDx/exec]"
+      method="POST"
+      target="hiddenFrame"
+      style="display:none;">
+    <input type="hidden" name="action" value="saveBase64">
+    <input type="hidden" name="base64" id="base64Field">
+    <input type="hidden" name="user" id="userField">
+</form>
+
+<script>
+const uploadBtn = document.getElementById("uploadBtn");
+const hiddenUpload = document.getElementById("hiddenUpload");
+const profileImg = document.getElementById("profileImg");
+const editIcon = document.getElementById("editIcon");
+const base64Field = document.getElementById("base64Field");
+const userField = document.getElementById("userField");
+
+const GAS_URL = "[https://script.google.com/macros/s/AKfycbyluiNgeQXBOw5KEnkWTqVMkCV8RdLLnzbyt3xwF29XnM6Bo4h4PynmS-jzibPLrCDx/exec]";
+
+userField.value = USER_NAME;
+
+// 选择照片
+uploadBtn.onclick = () => hiddenUpload.click();
+
+hiddenUpload.onchange = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    const compressed = await compressImage(file, 700);
+    const base64 = compressed.split(",")[1];
+
+    profileImg.src = compressed;
+    profileImg.style.display = "block";
+    editIcon.style.display = "block";
+    uploadBtn.style.display = "none";
+
+    base64Field.value = base64;
+    document.getElementById("uploadForm").submit();
+};
+
+function compressImage(file, maxWidth) {
+    return new Promise((resolve) => {
+        const reader = new FileReader();
+        reader.onload = (evt) => {
+            const img = new Image();
+            img.onload = () => {
+                const scale = Math.min(maxWidth / img.width, 1);
+                const canvas = document.createElement("canvas");
+                canvas.width = img.width * scale;
+                canvas.height = img.height * scale;
+                const ctx = canvas.getContext("2d");
+                ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+                resolve(canvas.toDataURL("image/jpeg", 0.75));
+            };
+            img.src = evt.target.result;
+        };
+        reader.readAsDataURL(file);
+    });
+}
+
+async function loadImageFromGAS() {
+    const res = await fetch(
+        `${GAS_URL}?action=getBase64&user=${encodeURIComponent(USER_NAME)}`
+    );
+
+    const text = await res.text();
+
+    if (text.trim() !== "") {
+        profileImg.src = "data:image/jpeg;base64," + text;
+        profileImg.style.display = "block";
+        editIcon.style.display = "block";
+        uploadBtn.style.display = "none";
+    }
+}
+loadImageFromGAS();
+
+editIcon.onclick = async () => {
+    if (!confirm("Remove this profile picture?")) return;
+
+    profileImg.style.display = "none";
+    editIcon.style.display = "none";
+    uploadBtn.style.display = "block";
+
+    await fetch(
+        `${GAS_URL}?action=deleteBase64&user=${encodeURIComponent(USER_NAME)}`
+    );
+};
+</script>
+
+</body>
+</html>
